@@ -1,0 +1,89 @@
+---
+title: "hunting_model"
+format: html
+---
+
+```{r}
+## Load packages
+
+library(deSolve)
+library(tidyverse)
+library(here)
+library(purrr)
+```
+
+```{r}
+lotvhunt <- function(t, pop, pars) {
+  with(as.list(c(pars, pop)), {
+    
+    hunt <- ifelse(prey >= prey_min, rhunt * prey, 0)
+    hunt <- min(hunt, prey)  # prevent negative prey
+    
+    dprey <- rprey * (1 - prey / K) * prey - alpha * prey * pred - hunt
+    dpred <- eff * alpha * prey * pred - pmort * pred
+    
+    return(list(c(dprey, dpred)))
+  })
+}
+```
+
+```{r}
+# parameter values
+base_pars <- list(
+  rprey = 0.95,
+  alpha = 0.01,
+  eff = 0.6,
+  pmort = 0.4,
+  K = 2000
+)
+
+# initial populations
+init_pop <- c(prey = 1000, pred = 100)
+
+# time steps (100 years)
+times <- seq(0, 100, by = 1)
+
+```
+
+```{r}
+check_stability <- function(rhunt, prey_min) {
+  pars <- c(base_pars, rhunt = rhunt, prey_min = prey_min)
+  sim <- ode(func = lotvhunt, y = init_pop, times = times, parms = pars)
+  
+  final_prey <- tail(sim[, "prey"], 1)
+  final_pred <- tail(sim[, "pred"], 1)
+  
+  return(final_prey >= 200 & final_pred >= 20)
+}
+
+```
+
+```{r}
+# define parameter grid
+rhunt_vals <- seq(0, 0.05, by = 0.005)
+prey_min_vals <- seq(100, 1000, by = 100)
+param_grid <- expand.grid(rhunt = rhunt_vals, prey_min = prey_min_vals)
+
+# run model for all combinations
+results <- param_grid %>%
+  mutate(stable = pmap_lgl(list(rhunt, prey_min), function(rh, pm) {
+    check_stability(rh, pm)
+  }))
+
+```
+
+```{r}
+ggplot(results, aes(x = rhunt, y = prey_min, fill = stable)) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("TRUE" = "forestgreen", "FALSE" = "firebrick"),
+                    labels = c("Unstable", "Stable")) +
+  labs(
+    title = "Stability Outcomes Under Different Hunting Scenarios",
+    x = "Hunting Rate (rhunt)",
+    y = "Minimum Prey Threshold (prey_min)",
+    fill = "Stability"
+  ) +
+  theme_minimal()
+
+```
+
