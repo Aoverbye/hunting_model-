@@ -6,11 +6,9 @@ format: html
 editor_options: 
   chunk_output_type: console
 ---
-
 ## Load Packages
-```{r, message = FALSE}
-#| code-fold: true
 
+```{r, message = FALSE}
 library(here)
 library(purrr)
 library(deSolve)
@@ -18,11 +16,13 @@ library(tidyverse)
 ```
 
 ## Source Functions
+
 ```{r}
 source(here("lotcvhunt.R"))
 ```
 
-## Exploration
+## Model Parameters and Setup
+
 ```{r}
 # parameter values
 base_pars <- list(
@@ -32,13 +32,17 @@ base_pars <- list(
   pmort = 0.4,
   K = 2000
 )
-
 # initial populations
-init_pop <- c(prey = 1000, pred = 100)
-
+init_pop <- c(prey = 100, pred = 10)
 # time steps (100 years)
 times <- seq(0, 100, by = 1)
 ```
+
+## Defining Stability
+
+
+## Stability Assessment Function
+
 
 ```{r}
 check_stability <- function(rhunt, prey_min) {
@@ -48,10 +52,12 @@ check_stability <- function(rhunt, prey_min) {
   final_prey <- tail(sim[, "prey"], 1)
   final_pred <- tail(sim[, "pred"], 1)
   
-  return(final_prey >= 200 & final_pred >= 20)
+  return(final_prey >= 50 & final_pred >= 10
+)
 }
-
 ```
+
+## Parameter Space Exploration
 
 ```{r}
 # define parameter grid
@@ -60,24 +66,90 @@ prey_min_vals <- seq(100, 1000, by = 100)
 param_grid <- expand.grid(rhunt = rhunt_vals, prey_min = prey_min_vals)
 
 # run model for all combinations
-results <- param_grid %>%
+stability_results <- param_grid %>%
   mutate(stable = pmap_lgl(list(rhunt, prey_min), function(rh, pm) {
     check_stability(rh, pm)
   }))
-
 ```
 
+## Stability Analysis Results
+
 ```{r}
-ggplot(results, aes(x = rhunt, y = prey_min, fill = stable)) +
-  geom_tile(color = "white") +
-  scale_fill_manual(values = c("TRUE" = "forestgreen", "FALSE" = "firebrick"),
-                    labels = c("Unstable", "Stable")) +
+# Show stable parameter combinations
+stable_combos <- stability_results %>% filter(stable == TRUE)
+cat("Number of stable parameter combinations:", nrow(stable_combos), "out of", nrow(param_grid), "\n")
+
+# Summary of stable hunting rates
+stable_summary <- stable_combos %>%
+  group_by(rhunt) %>%
+  summarise(
+    min_prey_min = min(prey_min),
+    max_prey_min = max(prey_min),
+    count = n(),
+    .groups = 'drop'
+  )
+
+print("Stable hunting rates and corresponding minimum prey thresholds:")
+stable_summary
+```
+
+## Visualization of Stability Landscape
+
+```{r}
+ggplot(stability_results, aes(x = rhunt, y = prey_min, fill = stable)) +
+  geom_tile() +
+  scale_fill_manual(values = c("FALSE" = "firebrick", "TRUE" = "darkblue"), 
+                    name = "Stable") +
   labs(
-    title = "Stability Outcomes Under Different Hunting Scenarios",
+    title = "Stability Landscape for Hunting Parameters",
     x = "Hunting Rate (rhunt)",
-    y = "Minimum Prey Threshold (prey_min)",
-    fill = "Stability"
+    y = "Minimum Prey Population Before Hunting",
+    caption = "Green = Stable, Red = Unstable"
   ) +
   theme_minimal()
 ```
 
+## Example Scenarios
+
+```{r}
+scenarios <- tibble(
+  name = c("Low", "Moderate", "High", "Extreme"),
+  rhunt = c(0.005, 0.015, 0.03, 0.05),
+  prey_min = c(100, 300, 500, 700)
+)
+
+scenario_results <- scenarios %>%
+  mutate(
+    output = map2(rhunt, prey_min, ~ {
+      pars <- c(base_pars, rhunt = .x, prey_min = .y)
+      as.data.frame(ode(y = init_pop, times = times, func = lotvhunt, parms = pars))
+    }),
+    stable = map2_lgl(rhunt, prey_min, check_stability)
+  )
+
+# Show which scenarios are stable
+scenario_stability <- scenarios %>%
+  mutate(stable = map2_lgl(rhunt, prey_min, check_stability))
+print("Scenario stability:")
+scenario_stability
+```
+
+## Population Dynamics Visualization
+
+```{r}
+results_long <- scenario_results %>%
+  unnest(output) %>%
+  pivot_longer(cols = c(prey, pred), names_to = "species", values_to = "population")
+
+ggplot(results_long, aes(x = time, y = population, color = species)) +
+  geom_line(size = 1) +
+  facet_wrap(~ name, ncol = 2) +
+  labs(
+    title = "Population Dynamics Under Different Hunting Scenarios",
+    x = "Time (years)",
+    y = "Population Size",
+    color = "Species"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
