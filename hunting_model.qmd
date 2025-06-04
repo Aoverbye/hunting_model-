@@ -2,10 +2,13 @@
 title: "Hunting Model"
 author: "Amanda Overbye and Matteo Torres"
 date: "June 3, 2025"
-format: html
+format: 
+  html:
+    embed-resources: true
 editor_options: 
   chunk_output_type: console
 ---
+
 ## Load Packages
 
 ```{r, message = FALSE}
@@ -59,7 +62,7 @@ check_stability <- function(rhunt, prey_min) {
 
 ## Parameter Space Exploration
 
-```{r}
+```{r, warning = FALSE}
 # define parameter grid
 rhunt_vals <- seq(0, 0.05, by = 0.005)
 prey_min_vals <- seq(100, 1000, by = 100)
@@ -136,7 +139,7 @@ scenario_stability
 
 ## Population Dynamics Visualization
 
-```{r}
+```{r, warning = FALSE}
 results_long <- scenario_results %>%
   unnest(output) %>%
   pivot_longer(cols = c(prey, pred), names_to = "species", values_to = "population")
@@ -153,3 +156,7 @@ ggplot(results_long, aes(x = time, y = population, color = species)) +
   theme_minimal() +
   theme(legend.position = "bottom")
 ```
+
+## Conclusion
+
+After running our analysis and testing various hunting rates, we concluded that a hunting rate of approximately 0.015 is ideal for maintaining stable predator and prey population sizes in the Lotka-Volterra model. We selected this rate based on our stability analysis, which visually demonstrated how different hunting rates influence population dynamics, particularly in relation to minimum prey thresholds required for hunting to occur. This conclusion was further supported by simulations of predefined hunting scenarios, where we compared population trajectories over time. As shown in the final visualization, the moderate hunting rate of 0.015 allows for sustainable prey removal without causing population collapse, thereby balancing ecological stability with hunting demands.
