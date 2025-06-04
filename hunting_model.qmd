@@ -1,32 +1,28 @@
 ---
-title: "hunting_model"
+title: "Hunting Model"
+author: "Amanda Overbye and Matteo Torres"
+date: "June 3, 2025"
 format: html
+editor_options: 
+  chunk_output_type: console
 ---
 
-```{r}
-## Load packages
+## Load Packages
+```{r, message = FALSE}
+#| code-fold: true
 
-library(deSolve)
-library(tidyverse)
 library(here)
 library(purrr)
+library(deSolve)
+library(tidyverse)
 ```
 
+## Source Functions
 ```{r}
-lotvhunt <- function(t, pop, pars) {
-  with(as.list(c(pars, pop)), {
-    
-    hunt <- ifelse(prey >= prey_min, rhunt * prey, 0)
-    hunt <- min(hunt, prey)  # prevent negative prey
-    
-    dprey <- rprey * (1 - prey / K) * prey - alpha * prey * pred - hunt
-    dpred <- eff * alpha * prey * pred - pmort * pred
-    
-    return(list(c(dprey, dpred)))
-  })
-}
+source(here("lotcvhunt.R"))
 ```
 
+## Exploration
 ```{r}
 # parameter values
 base_pars <- list(
@@ -42,7 +38,6 @@ init_pop <- c(prey = 1000, pred = 100)
 
 # time steps (100 years)
 times <- seq(0, 100, by = 1)
-
 ```
 
 ```{r}
@@ -84,6 +79,5 @@ ggplot(results, aes(x = rhunt, y = prey_min, fill = stable)) +
     fill = "Stability"
   ) +
   theme_minimal()
-
 ```
 
